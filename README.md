@@ -140,8 +140,9 @@ Create your multiquadlet files and start using them.
 - This is too small a codebase to be versioned -- just use the latest on main branch.
 - Compiled binaries have local dependencies with python versions, so it's best to compile locally.
 
-## Exampes
-TODO
+## Examples
+The examples directory contains 2 popular multi-container applications - immich and authentik.
+Both use advanced features like `depends_on` from compose file, podman secrets to manage passwords, `PartOf` to propagate container restarts. And I've also illustrated obtaining external variables from `image_versions.env` file. While this does work with immich v1.137.3 and authentik v2025.6.4 but these aren't maintained. It's only intended as an example to illustrate the file format.
 
 ## Debugging
 - Use this command to inspect the output of generator, right after running `daemon-reload`

@@ -1,0 +1,159 @@
+--- authentik-net.network ---
+[Unit]
+Description=Internal network for authentik containers
+After=network-online.target
+
+[Network]
+NetworkName=authentik-net
+Options=isolate=true
+# Below option doesn't work on podman 4.9.3, but should work v5.0.0 onwards
+# Options=isolate=strict
+
+--- authentik_postgresql.container ---
+[Unit]
+Description=Authentik Postgresql DB
+PartOf=authentik.target
+
+[Container]
+ContainerName=authentik_postgresql
+Image=${AUTHENTIK_POSTGRESQL_IMAGE}
+Volume=%h/containers/authentik/postgresql_data:/var/lib/postgresql/data
+
+Environment=POSTGRES_DB=authentik
+Environment=POSTGRES_USER=authentik
+Secret=authentik-pg-pass,type=env,target=POSTGRES_PASSWORD
+
+HealthCmd=pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}
+HealthStartPeriod=20s
+HealthInterval=30s
+HealthRetries=5
+HealthTimeout=5s
+
+Notify=healthy
+## Note, above "Notify=healthy" should just work, but there's a bug in quadlet/podman v4.9.3 which is fixed in podman v5.0.0. Below is a workaround that adds the --sdnotify again in the end for v4.9.3
+PodmanArgs=--sdnotify=healthy
+
+Network=authentik-net.network
+Label=io.containers.autoupdate=registry
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/authentik/image_versions.env
+
+--- authentik_redis.container ---
+[Unit]
+Description=Authentik Redis Broker
+PartOf=authentik.target
+
+[Container]
+ContainerName=authentik_redis
+Image=${AUTHENTIK_REDIS_IMAGE}
+Volume=%h/containers/authentik/redis_data:/data
+
+Exec= --save 60 1 --loglevel warning
+
+HealthCmd=redis-cli ping | grep PONG
+HealthStartPeriod=20s
+HealthInterval=30s
+HealthRetries=5
+HealthTimeout=3s
+
+Notify=healthy
+## Note, above "Notify=healthy" should just work, but there's a bug in quadlet/podman v4.9.3 which is fixed in podman v5.0.0. Below is a workaround that adds the --sdnotify again in the end for v4.9.3
+PodmanArgs=--sdnotify=healthy
+
+Network=authentik-net.network
+Label=io.containers.autoupdate=registry
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/authentik/image_versions.env
+
+--- authentik_server.container ---
+[Unit]
+Description=Authentik Server
+PartOf=authentik.target
+
+After=authentik_postgresql.service authentik_redis.service
+Requires=authentik_postgresql.service authentik_redis.service
+PartOf=authentik_postgresql.service authentik_redis.service
+
+[Container]
+ContainerName=authentik_server
+Image=ghcr.io/goauthentik/server:${AUTHENTIK_TAG}
+Volume=%h/containers/authentik/media:/media
+Volume=%h/containers/authentik/custom-templates:/templates
+
+Exec= server
+
+Environment=AUTHENTIK_REDIS__HOST=authentik_redis
+Environment=AUTHENTIK_POSTGRESQL__HOST=authentik_postgresql
+Environment=AUTHENTIK_POSTGRESQL__USER=authentik
+Environment=AUTHENTIK_POSTGRESQL__NAME=authentik
+
+Environment=AUTHENTIK_ERROR_REPORTING__ENABLED=true
+
+Secret=authentik-secret-key,type=env,target=AUTHENTIK_SECRET_KEY
+Secret=authentik-pg-pass,type=env,target=AUTHENTIK_POSTGRESQL__PASSWORD
+
+Label=traefik.enable=true
+Label=traefik.http.services.authentik.loadBalancer.server.port=9000
+Label=traefik.http.routers.authentik-router.rule=Host(`auth.${MYDOMAIN}`)
+Label=traefik.http.routers.authentik-router.entrypoints=websecure
+Label=traefik.http.routers.authentik-ex-router.rule=Host(`auth.${MYDOMAIN}`)
+Label=traefik.http.routers.authentik-ex-router.entrypoints=ex-websecure
+
+Network=authentik-net.network
+Label=io.containers.autoupdate=registry
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/authentik/image_versions.env
+
+--- authentik_worker.container ---
+[Unit]
+Description=Authentik Worker
+PartOf=authentik.target
+
+After=authentik_postgresql.service authentik_redis.service
+Requires=authentik_postgresql.service authentik_redis.service
+PartOf=authentik_postgresql.service authentik_redis.service
+
+[Container]
+ContainerName=authentik_worker
+Image=ghcr.io/goauthentik/server:${AUTHENTIK_TAG}
+Volume=%h/containers/authentik/media:/media
+Volume=%h/containers/authentik/certs:/certs
+Volume=%h/containers/authentik/custom-templates:/templates
+
+Exec= worker
+
+Environment=AUTHENTIK_REDIS__HOST=authentik_redis
+Environment=AUTHENTIK_POSTGRESQL__HOST=authentik_postgresql
+Environment=AUTHENTIK_POSTGRESQL__USER=authentik
+Environment=AUTHENTIK_POSTGRESQL__NAME=authentik
+
+Environment=AUTHENTIK_ERROR_REPORTING__ENABLED=true
+
+Secret=authentik-secret-key,type=env,target=AUTHENTIK_SECRET_KEY
+Secret=authentik-pg-pass,type=env,target=AUTHENTIK_POSTGRESQL__PASSWORD
+
+Network=authentik-net.network
+Label=io.containers.autoupdate=registry
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/authentik/image_versions.env
+
+--- authentik.target ---
+[Unit]
+Description=Authentik multi-container stack
+
+Wants=authentik_postgresql.service
+Wants=authentik_redis.service
+Wants=authentik_server.service
+Wants=authentik_worker.service
+
+[Install]
+WantedBy=default.target
+

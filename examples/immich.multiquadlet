@@ -1,0 +1,145 @@
+--- immich-model-cache.volume ---
+[Unit]
+Description=Immich Machine Learning Models Cache Volume
+
+[Volume]
+VolumeName=immich-model-cache
+
+--- immich-net.network ---
+[Unit]
+Description=Internal network for immich containers
+After=network-online.target
+
+[Network]
+NetworkName=immich-net
+Options=isolate=true
+# Doesn't seem to work podman 4.9.3, but should work v5.0.0 onwards
+# Options=isolate=strict
+
+--- immich_postgres.container ---
+
+[Unit]
+Description=Immich Postgresql DB
+PartOf=immich.target
+
+[Container]
+ContainerName=immich_postgres
+Image=${IMMICH_DATABASE_IMAGE}
+Volume=/media/data/immich_data/postgres:/var/lib/postgresql/data:z
+
+Environment=POSTGRES_DB=immich
+Environment=POSTGRES_USER=postgres
+Environment=POSTGRES_INITDB_ARGS=--data-checksums
+Environment=TZ=America/Los_Angeles
+
+Secret=immich-pg-pass,type=env,target=POSTGRES_PASSWORD
+
+HealthCmd=pg_isready --d ${POSTGRES_DB} -U ${POSTGRES_USER} || exit 1
+HealthStartPeriod=2m
+HealthInterval=5m
+HealthRetries=5
+HealthTimeout=30s
+
+Notify=healthy
+# Note, above "Notify=healthy" should just work, but there's a bug in quadlet/podman v4.9.3 which is fixed in podman v5.0.0. Below is a workaround that adds the --sdnotify again in the end for v4.9.3
+PodmanArgs=--sdnotify=healthy
+
+# Uncomment the DB_STORAGE_TYPE: 'HDD' var if your database isn't stored on SSDs
+# Environment=DB_STORAGE_TYPE=HDD
+
+ShmSize=128m
+
+Network=immich-net.network
+#Label=io.containers.autoupdate=registry
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/immich/image_versions.env
+
+--- immich_redis.container ---
+[Unit]
+Description=Immich Redis Broker
+PartOf=immich.target
+
+[Container]
+ContainerName=immich_redis
+Image=${IMMICH_REDIS_IMAGE}
+
+Environment=TZ=America/Los_Angeles
+HealthCmd=redis-cli ping || exit 1
+
+# This is as per recommendation here: https://hub.docker.com/r/valkey/valkey#systemd-startup-notification-with-podman-quadlet
+Exec=valkey-server --supervised systemd
+Notify=true
+
+Network=immich-net.network
+#Label=io.containers.autoupdate=registry
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/immich/image_versions.env
+
+--- immich_server.container ---
+[Unit]
+Description=Immich Server
+PartOf=immich.target
+
+After=immich_postgres.service immich_redis.service
+Requires=immich_postgres.service immich_redis.service
+PartOf=immich_postgres.service immich_redis.service
+
+[Container]
+ContainerName=immich_server
+Image=ghcr.io/immich-app/immich-server:${IMMICH_VERSION}
+Environment=TZ=America/Los_Angeles
+Environment=REDIS_HOSTNAME=immich_redis
+Environment=DB_HOSTNAME=immich_postgres
+Secret=immich-pg-pass,type=env,target=DB_PASSWORD
+Environment=DB_USERNAME=postgres
+Environment=DB_DATABASE_NAME=immich
+Environment=IMMICH_TELEMETRY_INCLUDE=all
+
+Volume=/media/data/immich_data/library:/data:z
+Volume=/etc/localtime:/etc/localtime:ro
+
+Network=immich-net.network
+Label=traefik.enable=true
+Label=traefik.http.services.immich.loadbalancer.server.port=2283
+Label=traefik.http.routers.immich-router.entrypoints=websecure
+Label=traefik.http.routers.immich-router.rule=Host(`immich.${MYDOMAIN}`)
+Label=traefik.http.routers.immich-ex.entrypoints=ex-websecure
+Label=traefik.http.routers.immich-ex.rule=Host(`immich.${MYDOMAIN}`)
+#Label=io.containers.autoupdate=registry
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/immich/image_versions.env
+
+--- immich_machine_learning.container ---
+[Unit]
+Description=Immich Machine Learning Container
+EnvironmentFile=%h/containers/immich/image_versions.env
+PartOf=immich.target
+
+[Container]
+ContainerName=immich_machine_learning
+Image=ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION}
+Volume=immich-model-cache.volume:/cache
+Network=immich-net.network
+
+[Service]
+Restart=on-failure
+EnvironmentFile=%h/containers/immich/image_versions.env
+
+--- immich.target ---
+[Unit]
+Description=Immich multi-container stack
+
+Wants=immich_postgres.service
+Wants=immich_redis.service
+Wants=immich_server.service
+Wants=immich_machine_learning.service
+
+[Install]
+WantedBy=default.target
+
