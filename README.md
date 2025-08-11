@@ -137,7 +137,8 @@ Now just doing a `sudo systemctl daemon-reload` or `systemctl --user daemon-relo
 Create your multiquadlet files and start using them.
 
 ## Releases?
-Also, this is too small a codebase to be versioned -- just use the latest on main branch. Compiled binaries have local dependencies, so it's best to compile locally.
+- This is too small a codebase to be versioned -- just use the latest on main branch.
+- Compiled binaries have local dependencies with python versions, so it's best to compile locally.
 
 ## Exampes
 TODO
@@ -154,7 +155,7 @@ TODO
 
 - Generator Not Found: If `systemctl --user daemon-reload` does not create the services, it is likely that the symlink to the multiquadlet script is not correctly placed.
 - Syntax Errors:
-	- If the delimiter format --- <filename> --- is incorrect, the multiquadlet generator itself may fail.
+	- If the delimiter format `--- <filename> ---` is incorrect, the multiquadlet generator itself may fail.
 	- The generated files should not conflict with other similarly named files either generated or already present in the directory.
 	- The generator will fail to create files if the syntax within one of the delimited sections is not a valid quadlet file format. systemd will report an error from the native quadlet generator in such cases. 
 - The Shell vs. Python Behavior: The multiquadlet.sh shell script is a simpler implementation that may not handle all parsing and error conditions as gracefully as the multiquadlet.py Python version. The Python version, especially when compiled with Cython, offers more robust parsing and error handling, making it the preferred choice for reliable, long-term use.
