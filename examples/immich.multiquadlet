@@ -34,15 +34,8 @@ Environment=TZ=America/Los_Angeles
 
 Secret=immich-pg-pass,type=env,target=POSTGRES_PASSWORD
 
-HealthCmd=pg_isready --d ${POSTGRES_DB} -U ${POSTGRES_USER} || exit 1
-HealthStartPeriod=2m
-HealthInterval=5m
-HealthRetries=5
-HealthTimeout=30s
-
-Notify=healthy
-# Note, above "Notify=healthy" should just work, but there's a bug in quadlet/podman v4.9.3 which is fixed in podman v5.0.0. Below is a workaround that adds the --sdnotify again in the end for v4.9.3
-PodmanArgs=--sdnotify=healthy
+# Postgres image does support systemd socket based notification.
+Notify=true
 
 # Uncomment the DB_STORAGE_TYPE: 'HDD' var if your database isn't stored on SSDs
 # Environment=DB_STORAGE_TYPE=HDD
