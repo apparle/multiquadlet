@@ -9,6 +9,7 @@ import shutil
 import re
 from SystemdUnitParser import SystemdUnitParser
 import subprocess
+import tempfile
 
 def log_with_level(level, message):
     """Logs a message with a specified kernel log level."""
@@ -76,10 +77,12 @@ def main():
             log_with_level(3, "Error: SYSTEMD_SCOPE is 'user' but XDG_RUNTIME_DIR is not set.")
             sys.exit(1)
         input_dir = os.path.expanduser('~/.config/containers/multiquadlet/')
-        interimdir = os.path.join(xdg_runtime_dir, "multiquadlet-generated")
     else:
         input_dir = os.path.abspath("/etc/containers/multiquadlet")
-        interimdir = os.path.abspath("/run/multiquadlet-generated")
+
+    interim_tmp_dir = tempfile.TemporaryDirectory(prefix='multiquadlet_gen_')
+    interimdir = interim_tmp_dir.name
+    log_with_level(6, f"Using temporary directory for intermediate quadet files: {interimdir}")
 
     if not len(sys.argv) > 1:
         log_with_level(3, f"Error: Must be run as: {os.path.basename(__file__)} gendir [gendir-early] [gendir-late]")
@@ -89,8 +92,6 @@ def main():
         log_with_level(4, f"Warning: Input directory '{input_dir}' does not exist. Skipping multiquadlet processing.")
         sys.exit(0)
 
-    shutil.rmtree(interimdir, ignore_errors=True)
-    os.makedirs(interimdir, exist_ok=True)
 
     # Copy files
     try:
@@ -149,13 +150,20 @@ def main():
     # Run podman generator
     try:
         podman_generator_path = f"/usr/lib/systemd/{systemd_scope}-generators/podman-{systemd_scope}-generator"
-        subprocess.run([podman_generator_path, *sys.argv[1:]], env={**os.environ, 'QUADLET_UNIT_DIRS': interimdir}, check=True)
+        result = subprocess.run([podman_generator_path, *sys.argv[1:]], env={**os.environ, 'QUADLET_UNIT_DIRS': interimdir}, check=True, capture_output=True, text=True)
+        log_with_level(6, f"Output of podman quadlet generator: \nSTDOUT: \n{result.stdout} \nSTDERR: \n{result.stderr}")
+        if result.returncode != 0:
+            log_with_level(3, f"Error: podman generator failed with exit code {result.returncode}.")
+            sys.exit(result.returncode)
+        else:
+            log_with_level(6, f"Podman generator completed successfuly.")
+
     except FileNotFoundError:
         log_with_level(3, f"Error: podman generator not found at '{podman_generator_path}'.")
         sys.exit(1)
-    except subprocess.CalledProcessError as e:
-        log_with_level(3, f"Error: podman generator failed with exit code {e.returncode}.")
-        sys.exit(e.returncode)
+    except Exception as e:
+        log_with_level(3, f"Error: unexpected error while running podman generator: {e}.")
+        sys.exit(1)
 
     # Process and copy generated target files
     for fname in os.listdir(interimdir):

@@ -104,14 +104,24 @@ if [[ "$SYSTEMD_SCOPE" == "user" ]]; then
         exit 1
     fi
     INPUT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/multiquadlet"
-    OUTDIR="$XDG_RUNTIME_DIR/multiquadlet-generated"
 else
     INPUT_DIR="/etc/containers/multiquadlet"
-    OUTDIR="/run/multiquadlet-generated"
 fi
 
-mkdir -p "$OUTDIR"
-rm -rf "$OUTDIR"/*
+delete_outdir() {
+    if [ -n "$OUTDIR" ] && [ -d "$OUTDIR" ]; then
+        rm -rf "$OUTDIR"
+    fi
+}
+trap delete_outdir EXIT
+
+OUTDIR=$(mktemp -t -d multiquadlet_gen_XXXXXXXX)
+if [ ! -d "$OUTDIR" ]; then
+    log_with_level 3 "Error: Failed to create a temporary directory. Exiting"
+    exit 1
+fi
+
+log_with_level 6 "Created temporary directory: $OUTDIR"
 
 if [[ ! -d "$INPUT_DIR" ]]; then
     log_with_level 4 "Warning: Input directory '$INPUT_DIR' does not exist. Skipping multiquadlet processing."

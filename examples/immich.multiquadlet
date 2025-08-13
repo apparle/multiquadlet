@@ -111,7 +111,6 @@ EnvironmentFile=%h/containers/immich/image_versions.env
 --- immich_machine_learning.container ---
 [Unit]
 Description=Immich Machine Learning Container
-EnvironmentFile=%h/containers/immich/image_versions.env
 PartOf=immich.target
 
 [Container]
