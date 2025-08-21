@@ -70,7 +70,6 @@ The following software is required to use multiquadlet:
 - Podman (version 5.x or newer is recommended)
 - systemd (with user-level generator support)
 - Python 3.x
-- Alternatively `jq` and `jc` if using bash script.
 
 ### Clone the Repository
 ``` bash
@@ -111,8 +110,8 @@ To overcome the dependency problem above, Cython is used to compile the Python s
 
 The binary `./build/multiquadlet_gen` binary is ready for use. 
 
-### Generator Option 3: Bash Script
-There's a bash script `multiquadlet_gen.sh` which uses `jq` and `jc` to process the files. While this is not the recommended as I may not maintain the bash script, it does work well today. It requires `jq` and `jc` must be installed. 
+### (Deprecated) Generator Option 3: Bash Script
+There used to be bash version which built using `jq` and `jc`, but I removed it as I'm only maintaining python version. A version of it may be found on this repo's history. 
 
 ### Install the Generator
 The generator should be installed at system-level or user-level or both in:
@@ -126,11 +125,7 @@ ln -s ""$(pwd)/build/multiquadlet_gen" /usr/lib/systemd/user-generators/multiqua
 
 # If using python script
 ln -s ""$(pwd)/multiquadlet_gen.py" /usr/lib/systemd/user-generators/multiquadlet_gen.py
-
-# If using bash script
-ln -s ""$(pwd)/multiquadlet_gen.py" /usr/lib/systemd/user-generators/multiquadlet_gen.py
 ```
-
 
 Now just doing a `sudo systemctl daemon-reload` or `systemctl --user daemon-reload` should invoke the systemd generator.
 
@@ -159,7 +154,6 @@ Both use advanced features like `depends_on` from compose file, podman secrets t
 	- If the delimiter format `--- <filename> ---` is incorrect, the multiquadlet generator itself may fail.
 	- The generated files should not conflict with other similarly named files either generated or already present in the directory.
 	- The generator will fail to create files if the syntax within one of the delimited sections is not a valid quadlet file format. systemd will report an error from the native quadlet generator in such cases. 
-- The Shell vs. Python Behavior: The multiquadlet.sh shell script is a simpler implementation that may not handle all parsing and error conditions as gracefully as the multiquadlet.py Python version. The Python version, especially when compiled with Cython, offers more robust parsing and error handling, making it the preferred choice for reliable, long-term use.
 
 # Contributing & Future Development
 - Bug reports, Pull-requests, suggestions are welcome and encouraged.
