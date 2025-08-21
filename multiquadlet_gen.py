@@ -70,31 +70,6 @@ def update_source_path(f, source_file):
         log_with_level(3, f"Error: Cannot process input file '{f}', skipping: {e}")
         return True 
 
-
-def update_source_path_old(f, source_file):
-    if not os.path.isfile(f):
-        log_with_level(3, f"Error: Intermediate quadlet generated file not found: {f}. Skipping.")
-        return True
-
-    config = SystemdUnitParser()
-    try:
-        config.read(f)
-    except Exception as e:
-        print(f"Error: Failed to parse '{f}': {e}", file=sys.stderr)
-        log_with_level(3, f"Error: failed to parse file {f}")
-        return False
-
-    config.set('Unit', 'SourcePath', source_file)
-    log_with_level(6, f"Updated 'SourcePath' to '{source_file}' in '{f}'")
-
-    try:
-        with open(f, 'w') as configfile:
-            config.write(configfile)
-    except IOError as e:
-        log_with_level(3, f"Error writing to file {f}: {e}")
-        return False
-    
-
 def process_unit_install_section(normal_dir, unit_name):
     """Parses a systemd file and creates symlinks based on its [Install] section."""
     intermediate_unit_file = os.path.join(normal_dir, unit_name)
