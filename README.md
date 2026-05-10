@@ -143,10 +143,10 @@ Both use advanced features like `depends_on` from compose file, podman secrets t
 - Use this command to inspect the output of generator, right after running `daemon-reload`
 	``` file.sh
 	# System containers
-	journald -S '1 minute ago' | grep multiquadlet_gen
+	journalctl -S '1 minute ago' | grep multiquadlet_gen
 
 	# User containers
-	journald --user -S '1 minute ago'` | grep multiquadlet_gen
+	journalctl --user -S '1 minute ago'` | grep multiquadlet_gen
 	```
 
 - Generator Not Found: If `systemctl --user daemon-reload` does not create the services, it is likely that the symlink to the multiquadlet script is not correctly placed.
